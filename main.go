@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -27,12 +26,10 @@ type config struct {
 // loads config into config struct from given file name
 func (c *config) loadConfig() {
 	jsonFile, err := os.Open(CONFIG_PATH)
-	if err != nil {
-		fmt.Println(err)
-	}
+	chkError(err)
 	defer jsonFile.Close()
 
-	err = json.NewDecoder(jsonFile).Decode(&c)
+	err = json.NewDecoder(jsonFile).Decode(c)
 	chkError(err)
 }
 
@@ -321,15 +318,47 @@ type FCUserSchedule struct {
 // ### MAIN ###
 func main() {
 	//load config
-	var cfg config
-	cfg.loadConfig()
+	var c config
+	c.loadConfig()
 
-	getToken(&cfg)
-	fmt.Println(cfg)
+	//getToken(cfg)
+	var fcSelf FCSelf
+	apiCall("/user/describe", &fcSelf, &c)
+	var fcAircraft FCAircraft
+	apiCall("/aircraft/"+fcSelf.Data[0].FboID, &fcAircraft, &c)
+	var fcUsers FCUsers
+	apiCall("/users/"+fcSelf.Data[0].FboID, &fcUsers, &c)
+
+}
+func apiCall(uri string, v any, c *config) {
+	chkError(json.Unmarshal(tryGet(uri, c), v))
+}
+
+func httpGet(host, uri string, bearer string) (respBody []byte, status int) {
+	req, err := http.NewRequest("GET", host+uri, nil)
+	chkError(err)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Authorization", "Bearer "+bearer)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	chkError(err)
+	defer resp.Body.Close()
+
+	respBody, err = io.ReadAll(resp.Body)
+	chkError(err)
+	status = resp.StatusCode
+
+	return
 }
 
 func httpPost(host, uri string, requestBody []byte) (respBody []byte, status int) {
-	resp, err := http.Post(host+uri, "application/x-www-form-urlencoded", bytes.NewBuffer(requestBody))
+	req, err := http.NewRequest("POST", host+uri, bytes.NewReader(requestBody))
+	chkError(err)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	chkError(err)
 	defer resp.Body.Close()
 
@@ -356,6 +385,18 @@ func getTokenFromRefresh(c *config) (statusCode int) {
 	err = json.Unmarshal(respBody, &c)
 	chkError(err)
 
+	return
+}
+
+func tryGet(uri string, c *config) (respBody []byte) {
+	respBody, status := httpGet(c.Host, uri, c.AccessToken)
+	if status != 200 {
+		getToken(c)
+		respBody, status = httpGet(c.Host, uri, c.AccessToken)
+		if status != 200 {
+			log.Fatalln(respBody, status)
+		}
+	}
 	return
 }
 
