@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/FreakinRocket/zapi"
+	"github.com/freakinrocket/zapi"
 )
 
 // region FlightCircle Structs
@@ -283,8 +283,8 @@ type FCUserSchedule struct {
 // ### MAIN ###
 func main() {
 	//load config
-	var c zapi.config
-	c.loadConfig()
+	var c zapi.Config
+	c.LoadConfig()
 
 	//get information about currently logged in user
 	var fcSelf FCSelf
