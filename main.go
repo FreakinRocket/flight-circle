@@ -1,45 +1,10 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"log"
-	"net/http"
-	"os"
 	"time"
+
+	"github.com/FreakinRocket/zapi"
 )
-
-// ### CONSTANTS ###
-const CONFIG_PATH string = "config.json"
-
-// struct contains information that should remain secret and not be included in the online repository
-type config struct {
-	ClientID     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
-	Host         string `json:"api_URL"`
-	Code         string `json:"code"`
-	RefreshToken string `json:"refresh_token"`
-	AccessToken  string `json:"access_token"`
-}
-
-// loads config into config struct from given file name
-func (c *config) loadConfig() {
-	jsonFile, err := os.Open(CONFIG_PATH)
-	chkError(err)
-	defer jsonFile.Close()
-
-	err = json.NewDecoder(jsonFile).Decode(c)
-	chkError(err)
-}
-
-// saves config to file from struct
-func (c config) saveConfig() {
-	jsonFile, err := json.MarshalIndent(c, "", " ")
-	chkError(err)
-	err = os.WriteFile(CONFIG_PATH, jsonFile, 0644)
-	chkError(err)
-}
 
 // region FlightCircle Structs
 // ### FLIGHT CIRCLE STRUCTS ###
@@ -318,23 +283,23 @@ type FCUserSchedule struct {
 // ### MAIN ###
 func main() {
 	//load config
-	var c config
+	var c zapi.config
 	c.loadConfig()
 
 	//get information about currently logged in user
 	var fcSelf FCSelf
-	apiCall("/user/describe", &fcSelf, &c)
+	zapi.ApiCall("/user/describe", &fcSelf, &c)
 
 	//list all aircraft from a given FboID
 	var fcAircraft FCAircraft
-	apiCall("/aircraft/"+fcSelf.Data[0].FboID, &fcAircraft, &c)
+	zapi.ApiCall("/aircraft/"+fcSelf.Data[0].FboID, &fcAircraft, &c)
 
 	//list all users from a given FboID
 	var fcUsers FCUsers
-	apiCall("/users/"+fcSelf.Data[0].FboID, &fcUsers, &c)
+	zapi.ApiCall("/users/"+fcSelf.Data[0].FboID, &fcUsers, &c)
 
 	var fcInstructors FCInstructors
-	apiCall("/instructors/"+fcSelf.Data[0].FboID, &fcInstructors, &c)
+	zapi.ApiCall("/instructors/"+fcSelf.Data[0].FboID, &fcInstructors, &c)
 
 	//var fcMaintenanceReminders []FCMaintenanceReminders
 	//for i, a := range fcAircraft.Data {
@@ -342,116 +307,4 @@ func main() {
 	//	apiCall("/maintenancereminders/"+fcSelf.Data[0].FboID+"/"+a.ID, &fcMaintenanceReminders[i], &c)
 	//}
 
-}
-
-// make a call to the configured API, stores response into input struct and check for error
-func apiCall(uri string, v any, c *config) {
-	chkError(json.Unmarshal(tryGet(uri, c), v))
-}
-
-// performs a http GET call with oauth2 bearer presentation in header
-func httpGet(host, uri string, bearer string) (respBody []byte, status int) {
-	req, err := http.NewRequest("GET", host+uri, nil)
-	chkError(err)
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Add("Authorization", "Bearer "+bearer)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	chkError(err)
-	defer resp.Body.Close()
-
-	respBody, err = io.ReadAll(resp.Body)
-	chkError(err)
-	status = resp.StatusCode
-
-	return
-}
-
-// performs a http POST call with oauth2 bearer presentation in request body
-func httpPost(host, uri string, requestBody []byte) (respBody []byte, status int) {
-	req, err := http.NewRequest("POST", host+uri, bytes.NewReader(requestBody))
-	chkError(err)
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	chkError(err)
-	defer resp.Body.Close()
-
-	respBody, err = io.ReadAll(resp.Body)
-	chkError(err)
-	status = resp.StatusCode
-
-	return
-}
-
-// gets a new access token using a refresh token
-func getTokenFromRefresh(c *config) (statusCode int) {
-	//use a refresh token to get an access token
-	requestBody, err := json.Marshal(map[string]string{
-		"refresh_token": c.RefreshToken,
-		"client_id":     c.ClientID,
-		"client_secret": c.ClientSecret,
-	})
-	chkError(err)
-
-	//make request
-	respBody, statusCode := httpPost(c.Host, "/token", requestBody)
-
-	//unmarshal response
-	err = json.Unmarshal(respBody, &c)
-	chkError(err)
-
-	return
-}
-
-// a http GET where if the first one fails it gets a new access code then tries again. This is how expired codes are handled
-func tryGet(uri string, c *config) (respBody []byte) {
-	respBody, status := httpGet(c.Host, uri, c.AccessToken)
-	if status != 200 {
-		getToken(c)
-		respBody, status = httpGet(c.Host, uri, c.AccessToken)
-		if status != 200 {
-			log.Fatalln(respBody, status)
-		}
-	}
-	return
-}
-
-// Get an initial access token and refresh token from a webpage generated authorization code. This value is entred in the config file before program launch
-func getTokensFromCode(c *config) (statusCode int) {
-
-	//create authorization code request body
-	requestBody, err := json.Marshal(map[string]string{
-		"code":          c.Code,
-		"client_id":     c.ClientID,
-		"client_secret": c.ClientSecret,
-	})
-	chkError(err)
-
-	//make request
-	respBody, statusCode := httpPost(c.Host, "/token", requestBody)
-
-	//unmarshal response
-	json.Unmarshal(respBody, &c)
-
-	return
-}
-
-// always attemps to get a new access token using a refresh token first, then if that fails it tries using an authorization code from the config file
-func getToken(c *config) {
-	if getTokenFromRefresh(c) != 200 {
-		if getTokensFromCode(c) != 200 {
-			log.Fatalln("Failed to get token")
-		}
-	}
-	c.saveConfig()
-}
-
-// saves programming time and log.fatalLn on an error
-func chkError(err error) {
-	if err != nil {
-		log.Fatalln(err)
-	}
 }
