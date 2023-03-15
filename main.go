@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FreakinRocket/zapi"
+	"github.com/FreakinRocket/zjson"
 )
 
 // region FlightCircle Data Structs
@@ -325,11 +326,28 @@ type FCUserSchedule struct {
 
 //endregion
 
+// region FleetData structs and functions
+// ### CONSTANTS ###
+const FLEET_DATA_PATH string = "fleet_data.json"
+const CONFIG_PATH string = "config.json"
+
+// struct contains information that should remain secret and not be included in the online repository
+type FleetData struct {
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+	Host         string `json:"api_URL"`
+	Code         string `json:"code"`
+	RefreshToken string `json:"refresh_token"`
+	AccessToken  string `json:"access_token"`
+}
+
 // ### MAIN ###
 func main() {
 	//load config
-	var c zapi.Config
-	c.LoadConfig()
+	c := zapi.Config{
+		FilePath: CONFIG_PATH,
+	}
+	zjson.LoadJSON(&c, c.FilePath)
 
 	//get current date and time
 	currentTime := time.Now()
@@ -355,32 +373,28 @@ func main() {
 	fmt.Println(currentTime.Format("01/02/06"))
 	fmt.Println(endTime.Format("01/02/06"))
 
-	endYear := endTime.Format("2006")
-	endMonth := endTime.Format("01")
-	endDay := endTime.Format("02")
-	startYear := startTime.Format("2006")
-	startMonth := startTime.Format("01")
-	startDay := startTime.Format("02")
-
 	//get information about currently logged in user
 	var fcSelf FCSelf
 	zapi.ApiCall("/user/describe", &fcSelf, &c)
 
+	//set FBO ID for easier access
+	fboID := fcSelf.Selfs[0].FboID
+
 	//list all aircraft from a given FboID
 	var fcAircraft FCAircraft
-	zapi.ApiCall("/aircraft/"+fcSelf.Selfs[0].FboID, &fcAircraft, &c)
+	zapi.ApiCall("/aircraft/"+fboID, &fcAircraft, &c)
 
 	//create list of active aircraft
-	var aircraft []Aircraft
+	aircraft := make(map[string]Aircraft)
 	for _, a := range fcAircraft.Aircraft {
 		if a.Status != "0" {
-			aircraft = append(aircraft, a)
+			aircraft[a.ID] = a
 		}
 	}
 
 	//get schedule entries for current two week block
 	var fcSchedules FCSchedules
-	callString := fmt.Sprint("/schedules/", fcSelf.Selfs[0].FboID, "/all/", startYear, "/", startMonth, "/", startDay, "/", endYear, "/", endMonth, "/", endDay)
+	callString := fmt.Sprint("/schedules/", fboID, "/all", makeFCDateString(startTime, endTime))
 	zapi.ApiCall(callString, &fcSchedules, &c)
 
 	//filter to entries only with a plane attached
@@ -391,8 +405,26 @@ func main() {
 		if s.Aircraft != "" {
 			schedules = append(schedules, s)
 			//add a count per each tail number
-			scheduleCounts[s.TailNumber] += 1
+			scheduleCounts[s.AircraftID] += 1
 		}
 	}
 	fmt.Println(scheduleCounts)
+
+	//get flights for current two week block
+	//var fcFlights FCFlights
+	//callString = fmt.Sprint("/flights/", makeFCDateString())
+
+}
+
+// returns a string with a leading "/"
+func makeFCDateString(startDate time.Time, endDate time.Time) (dateString string) {
+
+	startYear := startDate.Format("2006")
+	startMonth := startDate.Format("01")
+	startDay := startDate.Format("02")
+	endYear := endDate.Format("2006")
+	endMonth := endDate.Format("01")
+	endDay := endDate.Format("02")
+
+	return fmt.Sprint("/", startYear, "/", startMonth, "/", startDay, "/", endYear, "/", endMonth, "/", endDay)
 }

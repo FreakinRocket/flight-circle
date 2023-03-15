@@ -1,2 +1,4 @@
-github.com/FreakinRocket/zapi v0.0.3 h1:gHQLSCw43xAYk+KBJ/1DfDwPTutNjZy/A67ybNwDfjI=
-github.com/FreakinRocket/zapi v0.0.3/go.mod h1:ToXzDY2cX/zYwXqf367JhwxIOCjf8E0xVpe8ecGy1Z8=
+github.com/FreakinRocket/zapi v0.0.4 h1:I5dDABl9VfKquVHyHZvxttvbcZ69+UAV1OumRXe9BEY=
+github.com/FreakinRocket/zapi v0.0.4/go.mod h1:JMXVjLvovbRWHbNt2pdcdBVDTySx5ExqpyMqNMxVQIQ=
+github.com/FreakinRocket/zjson v0.0.4 h1:StIKzvhH+JLXciYiW62qi0jnk4rQ2OBHP/j1nfUlYwY=
+github.com/FreakinRocket/zjson v0.0.4/go.mod h1:/LglI4uI5PDhlgsHBxdvDGDhbsmOwxnekRRmdIOYJSI=
