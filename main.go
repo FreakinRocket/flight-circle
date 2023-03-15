@@ -2,22 +2,49 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/FreakinRocket/zapi"
 	"github.com/FreakinRocket/zjson"
 )
 
+// region MARS Structs
+type Fleet struct {
+	Meta struct {
+		LastUpdated time.Time `json:"last_updated"`
+	} `json:"meta"`
+	Planes         map[string]Aircraft `json:"aircraft"`
+	FilePath       string              `json:"-"`
+	ScheduleCounts map[string]int      `json:"schedule_counts"`
+	FboID          string              `json:"fbo_id"`
+}
+
+type Aircraft struct {
+	TailNumber     string    `json:"tail_number"`
+	DaysSinceFlown int       `json:"days_since_flown"`
+	LastFlown      time.Time `json:"last_flown"`
+}
+
+func NewFleet() *Fleet {
+	var f Fleet
+	f.Planes = make(map[string]Aircraft)
+	f.ScheduleCounts = make(map[string]int)
+	return &f
+}
+
+//endregion
+
 // region FlightCircle Data Structs
 // ### FLIGHT CIRCLE STRUCTS ###
 
 // access
-type Access struct {
+type FC_Access struct {
 	Msg string `json:"msg"`
 }
 
 // aircraft
-type Aircraft struct {
+type FC_Aircraft struct {
 	ID            string `json:"ID"`
 	FboID         string `json:"FboID"`
 	TailNumber    string `json:"tail_number"`
@@ -42,7 +69,7 @@ type Aircraft struct {
 }
 
 // squawk
-type Squawk struct {
+type FC_Squawk struct {
 	AircraftID   string      `json:"AircraftID"`
 	FboID        string      `json:"FboID"`
 	ID           string      `json:"ID"`
@@ -55,7 +82,7 @@ type Squawk struct {
 }
 
 // maintenance reminder
-type MXReminder struct {
+type FC_MXReminder struct {
 	AircraftID    string `json:"AircraftID"`
 	FboID         string `json:"FboID"`
 	ID            string `json:"ID"`
@@ -67,7 +94,7 @@ type MXReminder struct {
 }
 
 // instructor
-type Instructor struct {
+type FC_Instructor struct {
 	FboID         string `json:"FboID"`
 	InstructorID  string `json:"InstructorID"`
 	UserID        string `json:"UserID"`
@@ -83,7 +110,7 @@ type Instructor struct {
 }
 
 // schedule
-type Schedule struct {
+type FC_Schedule struct {
 	AircraftID      string `json:"AircraftID"`
 	FboID           string `json:"FboID"`
 	ID              string `json:"ID"`
@@ -102,7 +129,7 @@ type Schedule struct {
 }
 
 // flight
-type Flight struct {
+type FC_Flight struct {
 	ScheduleID                 string    `json:"ScheduleID"`
 	ArrivalDate                time.Time `json:"arrival_date"`
 	DepartDate                 time.Time `json:"depart_date"`
@@ -128,7 +155,7 @@ type Flight struct {
 }
 
 // cancellation
-type Cancellation struct {
+type FC_Cancellation struct {
 	CancelledBy        string    `json:"cancelled_by"`
 	CancelledByID      int       `json:"CancelledByID"`
 	CancelledDate      time.Time `json:"cancelled_date"`
@@ -144,7 +171,7 @@ type Cancellation struct {
 }
 
 // ledger
-type Ledger struct {
+type FC_Ledger struct {
 	EntryType   string      `json:"entry_type"`
 	EntryDate   time.Time   `json:"entry_date"`
 	Description string      `json:"description"`
@@ -157,7 +184,7 @@ type Ledger struct {
 }
 
 // self
-type Self struct {
+type FC_Self struct {
 	UserID           string `json:"UserID"`
 	AopaID           string `json:"aopa_id"`
 	FirstName        string `json:"first_name"`
@@ -174,7 +201,7 @@ type Self struct {
 }
 
 // user
-type User struct {
+type FC_User struct {
 	CustomerID              string `json:"CustomerID"`
 	FirstName               string `json:"first_name"`
 	LastName                string `json:"last_name"`
@@ -200,7 +227,7 @@ type User struct {
 }
 
 // next
-type Next struct {
+type FC_Next struct {
 	AircraftID      string    `json:"AircraftID"`
 	FboID           string    `json:"FboID"`
 	ID              string    `json:"ID"`
@@ -219,7 +246,7 @@ type Next struct {
 }
 
 // user schedule
-type UserSchedule struct {
+type FC_UserSchedule struct {
 	AircraftID      string `json:"AircraftID"`
 	FboID           string `json:"FboID"`
 	ID              string `json:"ID"`
@@ -241,151 +268,124 @@ type UserSchedule struct {
 
 // region FlightCircle End Point Structs
 // meta
-type Meta struct {
+type FCMeta struct {
 	Error  bool `json:"error"`
 	Status int  `json:"status"`
 }
 
 // /access
 type FCAccess struct {
-	Acesses []Access `json:"data"`
-	Meta    `json:"meta"`
+	Acesses []FC_Access `json:"data"`
+	FCMeta  `json:"meta"`
 }
 
 // /aircraft/{ FboID }(/{ AircraftID })
 type FCAircraft struct {
-	Aircraft []Aircraft `json:"data"`
-	Meta     `json:"meta"`
+	Aircraft []FC_Aircraft `json:"data"`
+	FCMeta   `json:"meta"`
 }
 
 // /squawks/{ FboID }(/{ ID })
 type FCSquawks struct {
-	Squawks []Squawk `json:"data"`
-	Meta    `json:"meta"`
+	Squawks []FC_Squawk `json:"data"`
+	FCMeta  `json:"meta"`
 }
 
 // /maintenancereminders/{ FboID }(/{ ID })
 type FCMaintenanceReminders struct {
-	MXReminders []MXReminder `json:"data"`
-	Meta        `json:"meta"`
+	MXReminders []FC_MXReminder `json:"data"`
+	FCMeta      `json:"meta"`
 }
 
 // /instructors/{ FboID }(/{ InstructorID })
 type FCInstructors struct {
-	Instructors []Instructor `json:"data"`
-	Meta        `json:"meta"`
+	Instructors []FC_Instructor `json:"data"`
+	FCMeta      `json:"meta"`
 }
 
 // /schedules/{ FboID }/{ InstructorID }(/{ year }(/{ month }(/{ day }(/{ eyear }(/{ emonth }(/{ eday }))))))
 type FCSchedules struct {
-	Schedules []Schedule `json:"data"`
-	Meta      `json:"meta"`
+	Schedules []FC_Schedule `json:"data"`
+	FCMeta    `json:"meta"`
 }
 
 // /flights/{ FboID }?year={ year }&month={ month }&day={ day }&eyear={ eyear }&emonth={ emonth }&eday={ eday }
 type FCFlights struct {
-	Flights []Flight `json:"data"`
-	Meta    `json:"meta"`
+	Flights []FC_Flight `json:"data"`
+	FCMeta  `json:"meta"`
 }
 
 // /cancellations/{ FboID }?year={ year }&month={ month }&day={ day }&eyear={ eyear }&emonth={ emonth }&eday={ eday }
 type FCCancellations struct {
-	Cancellations []Cancellation `json:"data"`
-	Meta          `json:"meta"`
+	Cancellations []FC_Cancellation `json:"data"`
+	FCMeta        `json:"meta"`
 }
 
 // /ledger/{ FboID }/{ UserID }?year={ year }&month={ month }&day={ day }&eyear={ eyear }&emonth={ emonth }&eday={ eday }
 type FCLedger struct {
-	Ledgers []Ledger `json:"data"`
-	Meta    `json:"meta"`
+	Ledgers []FC_Ledger `json:"data"`
+	FCMeta  `json:"meta"`
 }
 
 // /user/describe
 type FCSelf struct {
-	Selfs []Self `json:"data"`
-	Meta  `json:"meta"`
+	Selfs  []FC_Self `json:"data"`
+	FCMeta `json:"meta"`
 }
 
 // /users/{ FboID }
 type FCUsers struct {
-	Users []User `json:"data"`
-	Meta  `json:"meta"`
+	Users  []FC_User `json:"data"`
+	FCMeta `json:"meta"`
 }
 
 // /user/schedule/next/{ FboID }(/{ UserID })
 type FCNext struct {
-	Nexts []Next `json:"data"`
-	Meta  `json:"meta"`
+	Nexts  []FC_Next `json:"data"`
+	FCMeta `json:"meta"`
 }
 
 // /user/schedules/{ FboID }/{ UserID }(/{ year }(/{ month }(/{ day }(/{ eyear }(/{ emonth }(/{ eday }))))))
 type FCUserSchedule struct {
-	UserSchedules []UserSchedule `json:"data"`
-	Meta          `json:"meta"`
+	UserSchedules []FC_UserSchedule `json:"data"`
+	FCMeta        `json:"meta"`
 }
 
 //endregion
 
-// region FleetData structs and functions
 // ### CONSTANTS ###
-const FLEET_DATA_PATH string = "fleet_data.json"
+const FLEET_PATH string = "fleet.json"
 const CONFIG_PATH string = "config.json"
-
-// struct contains information that should remain secret and not be included in the online repository
-type FleetData struct {
-	ClientID     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
-	Host         string `json:"api_URL"`
-	Code         string `json:"code"`
-	RefreshToken string `json:"refresh_token"`
-	AccessToken  string `json:"access_token"`
-}
 
 // ### MAIN ###
 func main() {
+	// region Initialization
 	//load config
-	c := zapi.Config{
-		FilePath: CONFIG_PATH,
-	}
+	var c zapi.Config
+	c.FilePath = CONFIG_PATH
 	zjson.LoadJSON(&c, c.FilePath)
 
-	//get current date and time
-	currentTime := time.Now()
-	//year, month, day := currentTime.Date()
-	weekday := int(currentTime.Weekday())
-	_, weeknum := currentTime.ISOWeek()
+	//load Fleet
+	mars := NewFleet()
+	mars.FilePath = FLEET_PATH
+	zjson.LoadJSON(&mars, mars.FilePath)
+	mars.Meta.LastUpdated = time.Now()
 
-	//calculate days left in 2 week block
-	daysLeft := 6 - weekday
-	if weeknum%2 == 1 {
-		daysLeft += 7
-	}
-
-	//calculate end date of 2 week block
-	endTime := currentTime.AddDate(0, 0, daysLeft)
-	//endYearInt, endMonthMonth, endDayInt := endTime.Date()
-
-	//calculate start date of 2 week block
-	startTime := currentTime.AddDate(0, 0, -1*(13-daysLeft))
-	//startYearInt, startMonthMonth, startDayInt := startTime.Date()
-
-	fmt.Println(startTime.Format("01/02/06"))
-	fmt.Println(currentTime.Format("01/02/06"))
-	fmt.Println(endTime.Format("01/02/06"))
+	//endregion
 
 	//get information about currently logged in user
 	var fcSelf FCSelf
-	zapi.ApiCall("/user/describe", &fcSelf, &c)
+	zapi.Call("/user/describe", &fcSelf, &c)
 
 	//set FBO ID for easier access
-	fboID := fcSelf.Selfs[0].FboID
+	mars.FboID = fcSelf.Selfs[0].FboID
 
 	//list all aircraft from a given FboID
 	var fcAircraft FCAircraft
-	zapi.ApiCall("/aircraft/"+fboID, &fcAircraft, &c)
+	zapi.Call("/aircraft/"+mars.FboID, &fcAircraft, &c)
 
 	//create list of active aircraft
-	aircraft := make(map[string]Aircraft)
+	aircraft := make(map[string]FC_Aircraft)
 	for _, a := range fcAircraft.Aircraft {
 		if a.Status != "0" {
 			aircraft[a.ID] = a
@@ -394,11 +394,12 @@ func main() {
 
 	//get schedule entries for current two week block
 	var fcSchedules FCSchedules
-	callString := fmt.Sprint("/schedules/", fboID, "/all", makeFCDateString(startTime, endTime))
-	zapi.ApiCall(callString, &fcSchedules, &c)
+	startDate, endDate := calcDateBlock()
+	callString := fmt.Sprint("/schedules/", mars.FboID, "/all", makeFCDateString(startDate, endDate))
+	zapi.Call(callString, &fcSchedules, &c)
 
 	//filter to entries only with a plane attached
-	var schedules []Schedule
+	var schedules []FC_Schedule
 	scheduleCounts := make(map[string]int)
 
 	for _, s := range fcSchedules.Schedules {
@@ -408,16 +409,43 @@ func main() {
 			scheduleCounts[s.AircraftID] += 1
 		}
 	}
-	fmt.Println(scheduleCounts)
 
-	//get flights for current two week block
-	//var fcFlights FCFlights
-	//callString = fmt.Sprint("/flights/", makeFCDateString())
+	//get flights over past 30 days
+	var fcFlights FCFlights
+	startDate, endDate = calc30DaysAgo()
+	callString = fmt.Sprint("/flights/", mars.FboID, makeFCDateStringReq(startDate, endDate))
+	zapi.Call(callString, &fcFlights, &c)
+
+	flights := make(map[string][]FC_Flight)
+	for _, f := range fcFlights.Flights {
+		if f.AircraftID != "" {
+			flights[f.AircraftID] = append(flights[f.AircraftID], f)
+		}
+	}
+
+	for k, v := range flights {
+		for _, fs := range v {
+			if fs.DepartDate.After(mars.Planes[k].LastFlown) {
+				entry := mars.Planes[k]
+				entry.LastFlown = fs.DepartDate
+				entry.DaysSinceFlown = int(time.Since(fs.DepartDate.Local()).Hours() / 24)
+				entry.TailNumber = aircraft[k].TailNumber
+				mars.Planes[k] = entry
+			}
+			//fs.DepartDate
+		}
+	}
+	for k, v := range mars.Planes {
+		fmt.Println(aircraft[k].TailNumber + " " + v.LastFlown.Local().Format("01/02/06") + "  " + strconv.Itoa(v.DaysSinceFlown) + " days since last flown.")
+	}
+
+	zjson.SaveJSON(&mars, FLEET_PATH)
 
 }
 
+// region My Functions
 // returns a string with a leading "/"
-func makeFCDateString(startDate time.Time, endDate time.Time) (dateString string) {
+func makeFCDateString(startDate, endDate time.Time) (dateString string) {
 
 	startYear := startDate.Format("2006")
 	startMonth := startDate.Format("01")
@@ -428,3 +456,46 @@ func makeFCDateString(startDate time.Time, endDate time.Time) (dateString string
 
 	return fmt.Sprint("/", startYear, "/", startMonth, "/", startDay, "/", endYear, "/", endMonth, "/", endDay)
 }
+
+func calcDateBlock() (startDate, endDate time.Time) {
+	//get current date and time
+	currentTime := time.Now()
+
+	//get day of week (0-6; 0=Sun), and get week number (1-53)
+	weekday := int(currentTime.Weekday())
+	_, weeknum := currentTime.ISOWeek()
+
+	//calculate days left in 2 week block
+	daysLeft := 6 - weekday
+	if weeknum%2 == 1 {
+		daysLeft += 7
+	}
+
+	//calculate end date of 2 week block
+	endDate = currentTime.AddDate(0, 0, daysLeft)
+
+	//calculate start date of 2 week block
+	startDate = currentTime.AddDate(0, 0, -1*(13-daysLeft))
+
+	return
+}
+
+// returns a string with a leading "?"
+func makeFCDateStringReq(startDate, endDate time.Time) (dateString string) {
+	startYear := startDate.Format("2006")
+	startMonth := startDate.Format("01")
+	startDay := startDate.Format("02")
+	endYear := endDate.Format("2006")
+	endMonth := endDate.Format("01")
+	endDay := endDate.Format("02")
+
+	return fmt.Sprint("?year=", startYear, "&month=", startMonth, "&day=", startDay, "&eyear=", endYear, "&emonth=", endMonth, "&eday=", endDay)
+}
+
+// returns the date 30 days ago
+func calc30DaysAgo() (oldDate, today time.Time) {
+	currentTime := time.Now()
+	return currentTime.AddDate(0, 0, -1*30), currentTime
+}
+
+//endregion
