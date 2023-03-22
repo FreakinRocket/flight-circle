@@ -355,21 +355,27 @@ type FCUserSchedule struct {
 
 // ### CONSTANTS ###
 const FLEET_PATH string = "fleet.json"
-const CONFIG_PATH string = "config.json"
+const FLIGHTCIRCLE_PATH string = "flightcircle.json"
+const GMAIL_PATH string = "gmail.json"
 
 // ### MAIN ###
 func main() {
 	// region Initialization
-	//load config
-	var c zapi.Config
-	c.FilePath = CONFIG_PATH
-	zjson.LoadJSON(&c, c.FilePath)
+	//load flight circle config
+	var fc zapi.Config
+	fc.FilePath = FLIGHTCIRCLE_PATH
+	zjson.LoadJSON(&fc, fc.FilePath)
 
 	//load Fleet
 	mars := NewFleet()
 	mars.FilePath = FLEET_PATH
 	zjson.LoadJSON(&mars, mars.FilePath)
 	mars.Meta.LastUpdated = time.Now()
+
+	//load gmail config
+	var gm zapi.Config
+	gm.FilePath = GMAIL_PATH
+	zjson.LoadJSON(&gm, gm.FilePath)
 
 	//endregion
 
@@ -382,7 +388,7 @@ func main() {
 
 	//list all aircraft from a given FboID
 	var fcAircraft FCAircraft
-	zapi.Call("/aircraft/"+mars.FboID, &fcAircraft, &c)
+	zapi.Call("/aircraft/"+mars.FboID, &fcAircraft, &fc)
 
 	//create list of active aircraft
 	aircraft := make(map[string]FC_Aircraft)
@@ -396,7 +402,7 @@ func main() {
 	var fcSchedules FCSchedules
 	startDate, endDate := calcDateBlock()
 	callString := fmt.Sprint("/schedules/", mars.FboID, "/all", makeFCDateString(startDate, endDate))
-	zapi.Call(callString, &fcSchedules, &c)
+	zapi.Call(callString, &fcSchedules, &fc)
 
 	//filter to entries only with a plane attached
 	var schedules []FC_Schedule
@@ -414,7 +420,7 @@ func main() {
 	var fcFlights FCFlights
 	startDate, endDate = calc30DaysAgo()
 	callString = fmt.Sprint("/flights/", mars.FboID, makeFCDateStringReq(startDate, endDate))
-	zapi.Call(callString, &fcFlights, &c)
+	zapi.Call(callString, &fcFlights, &fc)
 
 	flights := make(map[string][]FC_Flight)
 	for _, f := range fcFlights.Flights {

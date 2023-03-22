@@ -1,4 +1,3 @@
-config.json
-fleet.json
+*.json
 *debug*
 *.exe
