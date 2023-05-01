@@ -1,4 +1,4 @@
-module github.com/freakinrocket/flight-circle
+module github.com/FreakinRocket/flight-circle
 
 go 1.20
 
