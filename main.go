@@ -379,9 +379,13 @@ func main() {
 
 	//endregion
 
+	// region GMAIL test
+
+	//endregion
+
 	//get information about currently logged in user
 	var fcSelf FCSelf
-	zapi.Call("/user/describe", &fcSelf, &c)
+	zapi.Call("/user/describe", &fcSelf, &fc)
 
 	//set FBO ID for easier access
 	mars.FboID = fcSelf.Selfs[0].FboID
@@ -431,21 +435,20 @@ func main() {
 
 	//loop through the flights and get the most recent date an aircraft was flown
 	for k, v := range flights {
-		lastFlown := mars.Planes[k].LastFlown
 		//create copy of current plane
 		entry := mars.Planes[k]
-		entry.TailNumber = aircraft[k].TailNumber
+		entry.TailNumber = mars.Planes[k].TailNumber
 
 		//for each flight of this aircraft, check if it is more recent than the saved LastFlown, if it is, replace last flown
 		for _, fs := range v {
 			//if the stored last flown date is older than this flight, set last flown to this flight
-			if fs.DepartDate.After(mars.Planes[k].LastFlown) {
-				lastFlown = fs.DepartDate
+			if fs.DepartDate.After(entry.LastFlown) {
+				entry.LastFlown = fs.DepartDate
 			}
 		}
 
 		//update days since flown
-		entry.DaysSinceFlown = int(time.Since(lastFlown.Local()).Hours() / 24)
+		entry.DaysSinceFlown = int(time.Since(entry.LastFlown.Local()).Hours() / 24)
 		mars.Planes[k] = entry
 		//fs.DepartDate
 	}
