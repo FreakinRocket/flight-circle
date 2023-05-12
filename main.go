@@ -1,13 +1,17 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
 	"github.com/FreakinRocket/zapi"
 	"github.com/FreakinRocket/zjson"
-	"github.com/jhillyerd/enmime"
+	"github.com/sendgrid/sendgrid-go"
+	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
 // region MARS Structs
@@ -354,21 +358,18 @@ type FCUserSchedule struct {
 
 //endregion
 
-// region Gmail Structs
-type Gmail struct {
-	AccessToken  string `json:"access_token"`
-	AccessType   string `json:"access_type"`
-	APIURL       string `json:"api_URL"`
-	AuthURL      string `json:"auth_URL"`
-	ClientID     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
-	Code         string `json:"code"`
-	GrantType    string `json:"grant_type"`
-	RedirectURI  string `json:"redirect_uri"`
-	RefreshToken string `json:"refresh_token"`
-	ResponseType string `json:"response_type"`
-	Scope        string `json:"scope"`
-	State        string `json:"state"`
+// region SendGrid End Point Structs
+
+//region end
+
+// region Connectors Struct
+type Connectors struct {
+	EmailFrom     string `json:"email_from"`
+	EmailTo       string `json:"email_to"`
+	EmailFromName string `json:"email_from_name"`
+	EmailToName   string `json:"email_to_name"`
+	SendGridKey   string `json:"sendgrid_key"`
+	FilePath      string `json:"-"`
 }
 
 //endregion
@@ -377,6 +378,7 @@ type Gmail struct {
 const FLEET_PATH string = "fleet.json"
 const FLIGHTCIRCLE_PATH string = "flightcircle.json"
 const GMAIL_PATH string = "gmail.json"
+const CONNECTORS_PATH string = "connectors.json"
 
 // ### MAIN ###
 func main() {
@@ -398,9 +400,10 @@ func main() {
 	gm.FilePath = GMAIL_PATH
 	zjson.LoadJSON(&gm, gm.FilePath)
 
-	//endregion
-
-	// region GMAIL test
+	//load connectors config
+	var con Connectors
+	con.FilePath = CONNECTORS_PATH
+	zjson.LoadJSON(&con, con.FilePath)
 
 	//endregion
 
@@ -481,14 +484,28 @@ func main() {
 	zjson.SaveJSON(&mars, FLEET_PATH)
 	//endregion
 
-	// region build message
-	msg := enmime.Builder().
-		From("Zack", "thezackfarrington@gmail.com").
-		Subject("SP034").
-		Text([]byte("Here's a file")).
-		To("Zack", "zfarrington@cirrusaircraft.com")
+	// region SendGrid test
+	from := mail.NewEmail(con.EmailFromName, con.EmailFrom)
+	subject := "SP034"
+	to := mail.NewEmail(con.EmailToName, con.EmailTo)
+	plainTextContent := "Awesome"
+	htmlContent := "<strong>Awesome</strong>"
+	marsJson, _ := json.MarshalIndent(mars, "", " ")
+	marsb64 := base64.URLEncoding.EncodeToString(marsJson)
 
-	msg.AddFileAttachment("fleet.json")
+	attachment := mail.NewAttachment()
+
+	attachment.SetFilename(FLEET_PATH).SetContent(marsb64).SetType("application/json")
+
+	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent).AddAttachment(attachment)
+	client := sendgrid.NewSendClient(con.SendGridKey)
+	_, err := client.Send(message)
+	if err != nil {
+		log.Println(err)
+	} else {
+		fmt.Println("Good")
+	}
+
 	//endregion
 }
 
