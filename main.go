@@ -29,6 +29,8 @@ type Aircraft struct {
 	TailNumber     string    `json:"tail_number"`
 	DaysSinceFlown int       `json:"days_since_flown"`
 	LastFlown      time.Time `json:"last_flown"`
+	ScheduleCount  int       `json:"schedule_count"`
+	ID             string    `json:"id"`
 }
 
 func NewFleet() *Fleet {
@@ -36,6 +38,16 @@ func NewFleet() *Fleet {
 	f.Planes = make(map[string]Aircraft)
 	f.ScheduleCounts = make(map[string]int)
 	return &f
+}
+
+//endregion
+
+// region PowerBI structs
+type PowerBI struct {
+	Meta struct {
+		LastUpdated time.Time `json:"last_updated"`
+	} `json:"meta"`
+	Aircraft []Aircraft `json:"aircraft"`
 }
 
 //endregion
@@ -358,10 +370,6 @@ type FCUserSchedule struct {
 
 //endregion
 
-// region SendGrid End Point Structs
-
-//region end
-
 // region Connectors Struct
 type Connectors struct {
 	EmailFrom     string `json:"email_from"`
@@ -479,18 +487,28 @@ func main() {
 	zjson.SaveJSON(&mars, FLEET_PATH)
 	//endregion
 
+	// region prepare for PowerBI
+	var pb PowerBI
+	for k, v := range mars.Planes {
+		v.ID = k
+		v.ScheduleCount = mars.ScheduleCounts[k]
+		pb.Aircraft = append(pb.Aircraft, v)
+	}
+	pb.Meta.LastUpdated = mars.Meta.LastUpdated
+	//endregion
+
 	// region SendGrid test
 	from := mail.NewEmail(con.EmailFromName, con.EmailFrom)
 	subject := "SP034"
 	to := mail.NewEmail(con.EmailToName, con.EmailTo)
 	plainTextContent := "Awesome"
 	htmlContent := "<strong>Awesome</strong>"
-	marsJson, _ := json.MarshalIndent(mars, "", " ")
-	marsb64 := base64.URLEncoding.EncodeToString(marsJson)
+	pbJson, _ := json.MarshalIndent(pb, "", " ")
+	pbb64 := base64.URLEncoding.EncodeToString(pbJson)
 
 	attachment := mail.NewAttachment()
 
-	attachment.SetFilename(FLEET_PATH).SetContent(marsb64).SetType("application/json")
+	attachment.SetFilename(FLEET_PATH).SetContent(pbb64).SetType("application/json")
 
 	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent).AddAttachment(attachment)
 	client := sendgrid.NewSendClient(con.SendGridKey)
