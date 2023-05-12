@@ -395,11 +395,6 @@ func main() {
 	zjson.LoadJSON(&mars, mars.FilePath)
 	mars.Meta.LastUpdated = time.Now()
 
-	//load gmail config
-	var gm zapi.Config
-	gm.FilePath = GMAIL_PATH
-	zjson.LoadJSON(&gm, gm.FilePath)
-
 	//load connectors config
 	var con Connectors
 	con.FilePath = CONNECTORS_PATH
