@@ -7,6 +7,7 @@ import (
 
 	"github.com/FreakinRocket/zapi"
 	"github.com/FreakinRocket/zjson"
+	"github.com/jhillyerd/enmime"
 )
 
 // region MARS Structs
@@ -353,6 +354,25 @@ type FCUserSchedule struct {
 
 //endregion
 
+// region Gmail Structs
+type Gmail struct {
+	AccessToken  string `json:"access_token"`
+	AccessType   string `json:"access_type"`
+	APIURL       string `json:"api_URL"`
+	AuthURL      string `json:"auth_URL"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+	Code         string `json:"code"`
+	GrantType    string `json:"grant_type"`
+	RedirectURI  string `json:"redirect_uri"`
+	RefreshToken string `json:"refresh_token"`
+	ResponseType string `json:"response_type"`
+	Scope        string `json:"scope"`
+	State        string `json:"state"`
+}
+
+//endregion
+
 // ### CONSTANTS ###
 const FLEET_PATH string = "fleet.json"
 const FLIGHTCIRCLE_PATH string = "flightcircle.json"
@@ -360,6 +380,7 @@ const GMAIL_PATH string = "gmail.json"
 
 // ### MAIN ###
 func main() {
+
 	// region Initialization
 	//load flight circle config
 	var fc zapi.Config
@@ -383,6 +404,7 @@ func main() {
 
 	//endregion
 
+	// region Main Code
 	//get information about currently logged in user
 	var fcSelf FCSelf
 	zapi.Call("/user/describe", &fcSelf, &fc)
@@ -457,7 +479,17 @@ func main() {
 	}
 
 	zjson.SaveJSON(&mars, FLEET_PATH)
+	//endregion
 
+	// region build message
+	msg := enmime.Builder().
+		From("Zack", "thezackfarrington@gmail.com").
+		Subject("SP034").
+		Text([]byte("Here's a file")).
+		To("Zack", "zfarrington@cirrusaircraft.com")
+
+	msg.AddFileAttachment("fleet.json")
+	//endregion
 }
 
 // region My Functions
